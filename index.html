@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>คลังข้อมูลจราจร AI - Smart Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&family=Sarabun:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sarabun', sans-serif; background-color: #F1F5F9; }
+    h1, h2, h3, .font-heading { font-family: 'Prompt', sans-serif; }
+    .file-title-clamp {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .thumb-box {
+      background-image: radial-gradient(#CBD5E1 1px, transparent 1px);
+      background-size: 8px 8px;
+    }
+  </style>
+</head>
+<body class="text-slate-800 min-h-screen pb-16">
+
+  <!-- Header -->
+  <header class="bg-slate-900 text-white shadow-lg border-b-4 border-blue-600 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="bg-blue-600 text-[11px] font-heading font-semibold px-2.5 py-0.5 rounded uppercase tracking-wider">Smart Archive v3.5 (GitHub + LIFF)</span>
+          <span class="bg-purple-600/30 text-purple-200 border border-purple-400/40 text-[11px] px-2 py-0.5 rounded font-heading">🧬 MD5 Verified</span>
+          <span id="liffStatusBadge" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> เชื่อมต่อคลังข้อมูลแล้ว
+          </span>
+        </div>
+        <h1 class="text-lg sm:text-2xl font-bold mt-1">ระบบทะเบียนคุมคลังข้อมูลและตรวจดูเอกสารจราจร AI</h1>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="syncBtn" onclick="syncDriveNow()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-xs sm:text-sm font-heading font-medium shadow flex items-center gap-1.5 transition">
+          🔄 ซิงค์ไฟล์จาก Drive เดี๋ยวนี้
+        </button>
+        <button onclick="loadData(false)" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-2 rounded-lg text-xs sm:text-sm font-heading transition">
+          โหลดข้อมูลใหม่
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 mt-5 space-y-5">
+    <!-- Toast Notification -->
+    <div id="syncAlert" class="hidden bg-emerald-50 border border-emerald-300 text-emerald-900 px-4 py-3 rounded-xl text-sm font-heading flex justify-between items-center shadow-sm">
+      <span id="syncAlertText"></span>
+      <button onclick="document.getElementById('syncAlert').classList.add('hidden')" class="text-emerald-700 font-bold">✕</button>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-blue-400 transition" onclick="switchTab('files'); filterByBucket('ALL')">
+        <p class="text-xs text-slate-500 font-heading">เอกสารในคลังทั้งหมด</p>
+        <p id="totalFiles" class="text-3xl font-bold text-slate-900 mt-1">-</p>
+        <p class="text-xs text-emerald-600 mt-1">✅ รวมทุกช่องทางนำเข้า</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-purple-400 transition" onclick="switchTab('files')">
+        <p class="text-xs text-slate-500 font-heading">ดึงจาก Drive โดยตรง</p>
+        <p id="driveSyncedCount" class="text-3xl font-bold text-blue-600 mt-1">-</p>
+        <p class="text-xs text-slate-400 mt-1">☁️ Two-Way Sync</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-amber-400 transition" onclick="switchTab('files'); filterByBucket('99. ยังไม่ระบุหมวดหมู่')">
+        <p class="text-xs text-slate-500 font-heading">ถัง 99. ยังไม่ระบุ</p>
+        <p id="unspecifiedCount" class="text-3xl font-bold text-amber-600 mt-1">-</p>
+        <p class="text-xs text-amber-700 mt-1">📌 คลิกเพื่อคัดแยกถัง</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 cursor-pointer hover:border-teal-500 transition" onclick="switchTab('qa')">
+        <p class="text-xs text-slate-500 font-heading">คำถาม & ข้อเสนอแนะ</p>
+        <p id="qaCount" class="text-3xl font-bold text-teal-700 mt-1">-</p>
+        <p class="text-xs text-teal-600 mt-1">💬 คลิกเพื่อดูรายการ Q&A</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 col-span-2 lg:col-span-1">
+        <p class="text-xs text-slate-500 font-heading">ค้างรอเลือกถัง (Temp)</p>
+        <p id="pendingCount" class="text-3xl font-bold text-slate-700 mt-1">-</p>
+        <p class="text-xs text-slate-400 mt-1">⏳ รอกดปุ่มในแชต LINE</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs & View Switcher -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-300 gap-2">
+      <div class="flex gap-2 font-heading text-sm">
+        <button id="tabBtnFiles" onclick="switchTab('files')" class="px-5 py-2.5 rounded-t-xl font-bold bg-slate-900 text-white">
+          📂 ทะเบียนคุมไฟล์เอกสาร & ตัวอย่างไฟล์
+        </button>
+        <button id="tabBtnQA" onclick="switchTab('qa')" class="px-5 py-2.5 rounded-t-xl font-bold bg-white text-slate-600 hover:bg-slate-100 border border-b-0 border-slate-200">
+          💬 ข้อคำถาม & ข้อเสนอแนะ (Q&A)
+        </button>
+      </div>
+      <div id="viewModeSwitcher" class="flex items-center gap-1.5 pb-2 sm:pb-0">
+        <span class="text-xs font-heading text-slate-500 mr-1">มุมมองแสดงผล:</span>
+        <button id="btnViewTable" onclick="setViewMode('table')" class="px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-blue-600 text-white shadow-sm transition">
+          📋 ตาราง + รูปปก
+        </button>
+        <button id="btnViewGrid" onclick="setViewMode('grid')" class="px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 transition">
+          🗂️ การ์ดหน้าปกใหญ่
+        </button>
+      </div>
+    </div>
+
+    <!-- SECTION 1: FILES TAB -->
+    <div id="sectionFiles" class="space-y-5">
+      <!-- Bucket Progress Cards -->
+      <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <h2 class="text-sm font-bold text-slate-700">📊 สัดส่วนเอกสารแยกตามถังข้อมูล (คลิกที่การ์ดเพื่อกรองดูเฉพาะถัง)</h2>
+          <div id="folderShortcuts" class="flex flex-wrap gap-1.5"></div>
+        </div>
+        <div id="bucketCards" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5"></div>
+      </div>
+
+      <!-- Search & Filter Bar -->
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-3">
+        <div class="flex-1">
+          <input type="text" id="searchInput" oninput="renderFilesView()" placeholder="🔍 ค้นหาชื่อไฟล์, ผู้อัปโหลด, รหัส MD5, ประวัติย้ายถัง หรือวันที่..." 
+            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-600 outline-none text-sm">
+        </div>
+        <select id="channelFilter" onchange="renderFilesView()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
+          <option value="ALL">🌐 ทุกช่องทางนำเข้า</option>
+          <option value="LINE OA">💬 LINE OA (ไฟล์ปกติ/Batch)</option>
+          <option value="URL">🔗 ลิงก์เว็บไซต์ (URL Harvester)</option>
+          <option value="Unzip">📦 แตกไฟล์ .ZIP อัตโนมัติ</option>
+          <option value="Text">📝 ข้อความบันทึก (.txt)</option>
+          <option value="Drive">☁️ ซิงค์จาก Google Drive</option>
+          <option value="Rescue">🛟 เก็บกู้อัตโนมัติ (Auto-Rescue)</option>
+        </select>
+        <select id="bucketFilter" onchange="renderFilesView()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
+          <option value="ALL">📁 แสดงทุกถังข้อมูล (ทั้งหมด)</option>
+        </select>
+      </div>
+
+      <!-- Files Container (Table & Grid) -->
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap justify-between items-center gap-2">
+          <h3 class="text-sm font-bold text-slate-700">📋 รายการเอกสารและตัวอย่างหน้าปก (คลิกที่รูปหน้าปกหรือปุ่ม 👁️ เพื่อเปิดอ่านบนเว็บ)</h3>
+          <span id="resultCount" class="text-xs font-heading font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">0 รายการ</span>
+        </div>
+
+        <!-- Mode 1: Table View -->
+        <div id="tableViewContainer" class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 text-xs font-heading border-b border-slate-200">
+                <th class="py-3 px-3 whitespace-nowrap">ตัวอย่างไฟล์</th>
+                <th class="py-3 px-4 min-w-[280px] sm:min-w-[380px]">ชื่อไฟล์เอกสาร / ลายนิ้วมือ MD5 / ประวัติแก้ไข</th>
+                <th class="py-3 px-3 whitespace-nowrap">ถังข้อมูลปัจจุบัน & ประวัติย้ายถัง</th>
+                <th class="py-3 px-3 whitespace-nowrap">ผู้นำเข้า / ช่องทาง / ขนาด</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">เปิดดูตัวอย่าง / จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="fileTableBody" class="divide-y divide-slate-200 text-sm">
+              <tr><td colspan="5" class="text-center py-12 text-slate-400">⏳ กำลังดึงข้อมูลคลังเอกสารผ่าน API...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Mode 2: Card Grid View -->
+        <div id="gridViewContainer" class="hidden p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 bg-slate-50/60"></div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: Q&A / FEEDBACK TAB -->
+    <div id="sectionQA" class="hidden space-y-4">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <div>
+          <h2 class="text-base font-bold text-slate-800">💬 ทะเบียนข้อคำถาม (Q&A) และข้อเสนอแนะจาก LINE</h2>
+          <p class="text-xs text-slate-500">ส่งเข้าผ่านการพิมพ์ #คำถาม หรือ #ข้อเสนอแนะ หรือกดปุ่มในการ์ดแชตบอท</p>
+        </div>
+        <input type="text" id="qaSearchInput" oninput="renderQATable()" placeholder="🔍 ค้นหาคำถาม, ข้อเสนอแนะ หรือผู้ส่ง..." 
+          class="w-full sm:w-80 px-3.5 py-2 rounded-lg border border-slate-300 text-sm outline-none">
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 text-xs font-heading border-b border-slate-200">
+                <th class="py-3 px-4 whitespace-nowrap">วัน-เวลา / รหัส</th>
+                <th class="py-3 px-3 whitespace-nowrap">ประเภท</th>
+                <th class="py-3 px-4 min-w-[320px]">เนื้อหาข้อคำถาม / ข้อเสนอแนะ</th>
+                <th class="py-3 px-3 whitespace-nowrap">ผู้ส่ง / ช่องทาง</th>
+                <th class="py-3 px-3 whitespace-nowrap">สถานะ & บันทึกการตอบกลับ</th>
+                <th class="py-3 px-3 text-center whitespace-nowrap">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="qaTableBody" class="divide-y divide-slate-200 text-sm"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal ดูตัวอย่างไฟล์สดบนหน้าเว็บ -->
+  <div id="previewModal" class="fixed inset-0 bg-slate-900/80 hidden items-center justify-center z-50 p-2 sm:p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-5xl w-full h-[90vh] flex flex-col overflow-hidden border border-slate-300">
+      <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <span id="prevModalBucket" class="text-[11px] font-heading bg-blue-600 px-2 py-0.5 rounded">ถังข้อมูล</span>
+            <span id="prevModalMeta" class="text-xs text-slate-300 truncate"></span>
+          </div>
+          <h3 id="prevModalTitle" class="font-heading font-bold text-sm sm:text-base truncate mt-0.5">ชื่อไฟล์</h3>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <a id="prevModalExternalBtn" href="#" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-heading px-3 py-1.5 rounded-lg shadow transition">
+            📄 เปิดเต็มจอในแท็บใหม่ ↗
+          </a>
+          <button onclick="closePreviewModal()" class="bg-slate-800 hover:bg-red-600 text-white w-8 h-8 rounded-lg font-bold transition">✕</button>
+        </div>
+      </div>
+
+      <div class="flex-1 flex flex-col lg:flex-row overflow-hidden bg-slate-100">
+        <div id="prevModalViewerBox" class="flex-1 h-full relative flex items-center justify-center bg-slate-800 overflow-auto">
+          <iframe id="prevModalIframe" class="w-full h-full border-0" allow="autoplay"></iframe>
+        </div>
+
+        <div class="w-full lg:w-72 bg-white border-t lg:border-t-0 lg:border-l border-slate-200 p-4 flex flex-col justify-between overflow-y-auto shrink-0">
+          <div class="space-y-3">
+            <div class="text-xs font-heading font-bold text-slate-700 border-b pb-1.5">📌 ข้อมูลจำเพาะของเอกสาร</div>
+            <div class="text-xs space-y-1.5 text-slate-600">
+              <div><span class="font-semibold text-slate-800">ผู้นำส่ง:</span> <span id="prevInfoSender">-</span></div>
+              <div><span class="font-semibold text-slate-800">วัน-เวลา:</span> <span id="prevInfoTime">-</span></div>
+              <div><span class="font-semibold text-slate-800">ขนาดไฟล์:</span> <span id="prevInfoSize">-</span></div>
+              <div><span class="font-semibold text-slate-800">ช่องทาง:</span> <span id="prevInfoChannel">-</span></div>
+              <div class="pt-1">
+                <span class="font-semibold text-slate-800 block">🧬 รหัสลายนิ้วมือ MD5:</span>
+                <code id="prevInfoHash" class="text-[11px] bg-slate-100 text-teal-800 px-1.5 py-0.5 rounded block mt-0.5 break-all border border-slate-200">-</code>
+              </div>
+            </div>
+
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-center mt-3">
+              <p class="text-[11px] font-heading font-semibold text-slate-700 mb-2">📲 สแกน QR เพื่อเปิดไฟล์บนมือถือ</p>
+              <img id="prevInfoQr" src="" alt="QR Code" class="w-32 h-32 mx-auto rounded-lg border border-slate-200 bg-white p-1">
+            </div>
+          </div>
+
+          <div class="pt-4 mt-4 border-t border-slate-200 flex flex-col gap-2">
+            <button id="prevModalEditBtn" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-xs font-heading font-semibold py-2 rounded-lg shadow transition">
+              ✏️ แก้ไขชื่อไฟล์ / ย้ายถังข้อมูล
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal แก้ไขชื่อไฟล์ & ย้ายถังข้อมูล -->
+  <div id="editModal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center">
+        <h3 class="font-heading font-bold text-base">✏️ แก้ไขชื่อไฟล์ / ย้ายถังจัดเก็บ</h3>
+        <button onclick="closeEditModal()" class="text-slate-400 hover:text-white text-lg">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="editFileId">
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">ชื่อไฟล์เอกสาร (มีผลกับไฟล์จริงบน Google Drive ทันที)</label>
+          <input type="text" id="editFileName" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 focus:border-blue-600 outline-none text-sm font-medium">
+        </div>
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">เลือกถังจัดเก็บ (หากเปลี่ยนถัง ระบบจะย้ายไฟล์ใน Drive และบันทึกประวัติ)</label>
+          <select id="editBucketKey" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-heading outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">ชื่อผู้แก้ไข (ระบบบันทึกในประวัติการแก้ไข)</label>
+          <input type="text" id="editActorName" placeholder="เช่น ร.ต.อ.วัชร์ชัยนันท์ (ปอ)" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 focus:border-blue-600 outline-none text-sm">
+        </div>
+      </div>
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeEditModal()" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-xs font-heading hover:bg-slate-100">ยกเลิก</button>
+        <button id="saveEditBtn" onclick="submitFileEdit()" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-heading font-semibold shadow">💾 บันทึกการเปลี่ยนแปลง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal อัปเดตสถานะ Q&A -->
+  <div id="qaModal" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div class="bg-teal-900 text-white px-5 py-4 flex justify-between items-center">
+        <h3 class="font-heading font-bold text-base">💬 บันทึกการตอบกลับ / อัปเดตสถานะ</h3>
+        <button onclick="closeQAModal()" class="text-slate-300 hover:text-white text-lg">✕</button>
+      </div>
+      <div class="p-5 space-y-4">
+        <input type="hidden" id="editQAId">
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">สถานะการดำเนินการ</label>
+          <select id="editQAStatus" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 bg-white text-sm font-heading outline-none">
+            <option value="รอดำเนินการ">⏳ รอดำเนินการ</option>
+            <option value="กำลังตรวจสอบ">🔍 กำลังตรวจสอบ</option>
+            <option value="ดำเนินการเรียบร้อย">✅ ดำเนินการเรียบร้อย</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">บันทึกคำตอบ / ผลการพิจารณา</label>
+          <textarea id="editQANote" rows="3" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm outline-none" placeholder="พิมพ์คำตอบหรือหมายเหตุ..."></textarea>
+        </div>
+        <div>
+          <label class="block text-xs font-heading text-slate-600 mb-1">ชื่อผู้บันทึก</label>
+          <input type="text" id="editQAActor" placeholder="เช่น ร.ต.อ.วัชร์ชัยนันท์ (ปอ)" class="w-full px-3.5 py-2 rounded-lg border border-slate-300 text-sm outline-none">
+        </div>
+      </div>
+      <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeQAModal()" class="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-xs font-heading">ยกเลิก</button>
+        <button id="saveQABtn" onclick="submitQAUpdate()" class="px-5 py-2 rounded-lg bg-teal-700 hover:bg-teal-800 text-white text-xs font-heading font-semibold shadow">💾 บันทึกสถานะ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ================= ตั้งค่าลิงก์ API ของ Google Apps Script และรหัส LIFF =================
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxMUaqdXRP9Da9QESwoHLXREM-IK5GNLHoXV5PRPw4n907chJHdLgTIoRYyushjor7x/exec';
+    const LIFF_ID = '2009589557-ZA877bKm';
+
+    let allFiles = [];
+    let allQA = [];
+    let folders = [];
+    let currentViewMode = localStorage.getItem('traffic_ai_view_mode') || 'table';
+    let currentUserProfileName = localStorage.getItem('traffic_ai_editor_name') || '';
+
+    async function initLiffProfile() {
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+          const profile = await liff.getProfile();
+          if (profile && profile.displayName) {
+            currentUserProfileName = profile.displayName;
+            localStorage.setItem('traffic_ai_editor_name', currentUserProfileName);
+            document.getElementById('liffStatusBadge').innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400"></span> 👤 ${escapeHtml(currentUserProfileName)}`;
+          }
+        }
+      } catch (e) {
+        console.log('LIFF Init Skip:', e);
+      }
+    }
+
+    // ดึงข้อมูลผ่าน Fetch JSON API (ไม่ติดบล็อก Multi-login 100%)
+    async function loadData(autoSync = false) {
+      document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-12 text-slate-400 font-heading">⏳ กำลังดึงข้อมูลคลังเอกสาร...</td></tr>';
+      try {
+        const url = `${GAS_API_URL}?action=getData&sync=${autoSync ? 'true' : 'false'}&t=${Date.now()}`;
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+        const json = await response.json();
+
+        if (json.status === 'error') {
+          throw new Error(json.message);
+        }
+        onDataLoaded(json.data || json);
+      } catch (err) {
+        document.getElementById('fileTableBody').innerHTML = `
+          <tr>
+            <td colspan="5" class="text-center py-10 text-red-600 bg-red-50 font-heading">
+              ⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้: ${escapeHtml(err.message)}<br>
+              <span class="text-xs text-slate-500 font-normal">กรุณาตรวจสอบว่าอัปเดตเวอร์ชันใหม่ (New version) ใน Google Apps Script แล้ว</span>
+            </td>
+          </tr>`;
+      }
+    }
+
+    async function syncDriveNow() {
+      const btn = document.getElementById('syncBtn');
+      btn.disabled = true;
+      btn.innerText = '⏳ กำลังสแกน Drive ทั้ง 8 ถัง...';
+      try {
+        const actor = encodeURIComponent(currentUserProfileName || 'กดปุ่ม Sync หน้าเว็บ');
+        const url = `${GAS_API_URL}?action=syncDrive&actor=${actor}&t=${Date.now()}`;
+        const response = await fetch(url, { method: 'GET', redirect: 'follow' });
+        const json = await response.json();
+
+        btn.disabled = false;
+        btn.innerText = '🔄 ซิงค์ไฟล์จาก Drive เดี๋ยวนี้';
+
+        if (json.status === 'error') throw new Error(json.message);
+
+        const alertBox = document.getElementById('syncAlert');
+        document.getElementById('syncAlertText').innerText = '✅ ' + (json.syncResult ? json.syncResult.message : 'ซิงค์สำเร็จ!');
+        alertBox.classList.remove('hidden');
+        if (json.data) onDataLoaded(json.data);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = '🔄 ซิงค์ไฟล์จาก Drive เดี๋ยวนี้';
+        alert('ซิงค์ไม่สำเร็จ: ' + err.message);
+      }
+    }
+
+    async function submitFileEdit() {
+      const fileId = document.getElementById('editFileId').value;
+      const newFileName = document.getElementById('editFileName').value.trim();
+      const newBucketKey = document.getElementById('editBucketKey').value;
+      const editorName = document.getElementById('editActorName').value.trim();
+
+      if (!newFileName || !editorName) {
+        alert('กรุณาระบุชื่อไฟล์และชื่อผู้แก้ไขให้ครบถ้วนครับ');
+        return;
+      }
+      currentUserProfileName = editorName;
+      localStorage.setItem('traffic_ai_editor_name', editorName);
+
+      const btn = document.getElementById('saveEditBtn');
+      btn.disabled = true;
+      btn.innerText = '⏳ กำลังบันทึก...';
+
+      try {
+        // ใช้ Content-Type: text/plain เพื่อหลีกเลี่ยงปัญหา CORS Preflight ของ Google Apps Script
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            webAction: 'updateFile',
+            payload: { fileId, newFileName, newBucketKey, editorName }
+          }),
+          redirect: 'follow'
+        });
+        const res = await response.json();
+        btn.disabled = false;
+        btn.innerText = '💾 บันทึกการเปลี่ยนแปลง';
+
+        if (res.status === 'error') throw new Error(res.message);
+
+        closeEditModal();
+        const alertBox = document.getElementById('syncAlert');
+        document.getElementById('syncAlertText').innerText = '✅ ' + res.message;
+        alertBox.classList.remove('hidden');
+        loadData(false);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = '💾 บันทึกการเปลี่ยนแปลง';
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      }
+    }
+
+    async function submitQAUpdate() {
+      const qaId = document.getElementById('editQAId').value;
+      const newStatus = document.getElementById('editQAStatus').value;
+      const adminNote = document.getElementById('editQANote').value.trim();
+      const editorName = document.getElementById('editQAActor').value.trim();
+
+      if (!editorName) {
+        alert('กรุณาระบุชื่อผู้บันทึกครับ');
+        return;
+      }
+      currentUserProfileName = editorName;
+      localStorage.setItem('traffic_ai_editor_name', editorName);
+
+      const btn = document.getElementById('saveQABtn');
+      btn.disabled = true;
+      btn.innerText = '⏳ กำลังบันทึก...';
+
+      try {
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            webAction: 'updateQA',
+            payload: { qaId, newStatus, adminNote, editorName }
+          }),
+          redirect: 'follow'
+        });
+        const res = await response.json();
+        btn.disabled = false;
+        btn.innerText = '💾 บันทึกสถานะ';
+        if (res.status === 'error') throw new Error(res.message);
+        closeQAModal();
+        loadData(false);
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = '💾 บันทึกสถานะ';
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      }
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      localStorage.setItem('traffic_ai_view_mode', mode);
+      const tCont = document.getElementById('tableViewContainer');
+      const gCont = document.getElementById('gridViewContainer');
+      const btnT = document.getElementById('btnViewTable');
+      const btnG = document.getElementById('btnViewGrid');
+
+      if (mode === 'grid') {
+        tCont.classList.add('hidden');
+        gCont.classList.remove('hidden');
+        btnG.className = 'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-blue-600 text-white shadow-sm transition';
+        btnT.className = 'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 transition';
+      } else {
+        gCont.classList.add('hidden');
+        tCont.classList.remove('hidden');
+        btnT.className = 'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-blue-600 text-white shadow-sm transition';
+        btnG.className = 'px-3 py-1.5 rounded-lg text-xs font-heading font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 transition';
+      }
+      renderFilesView();
+    }
+
+    function switchTab(tab) {
+      const sFiles = document.getElementById('sectionFiles');
+      const sQA = document.getElementById('sectionQA');
+      const bFiles = document.getElementById('tabBtnFiles');
+      const bQA = document.getElementById('tabBtnQA');
+      const vSw = document.getElementById('viewModeSwitcher');
+
+      if (tab === 'qa') {
+        sFiles.classList.add('hidden');
+        vSw.classList.add('hidden');
+        sQA.classList.remove('hidden');
+        bQA.className = 'px-5 py-2.5 rounded-t-xl font-bold bg-teal-900 text-white';
+        bFiles.className = 'px-5 py-2.5 rounded-t-xl font-bold bg-white text-slate-600 hover:bg-slate-100 border border-b-0 border-slate-200';
+      } else {
+        sQA.classList.add('hidden');
+        sFiles.classList.remove('hidden');
+        vSw.classList.remove('hidden');
+        bFiles.className = 'px-5 py-2.5 rounded-t-xl font-bold bg-slate-900 text-white';
+        bQA.className = 'px-5 py-2.5 rounded-t-xl font-bold bg-white text-slate-600 hover:bg-slate-100 border border-b-0 border-slate-200';
+      }
+    }
+
+    function onDataLoaded(res) {
+      allFiles = res.files || [];
+      allQA = res.qaList || [];
+      folders = res.folderLinks || [];
+      const total = res.totalFiles || 0;
+      
+      document.getElementById('totalFiles').innerText = total;
+      document.getElementById('pendingCount').innerText = res.pendingCount;
+      document.getElementById('driveSyncedCount').innerText = res.driveSyncedCount;
+      document.getElementById('unspecifiedCount').innerText = res.unspecifiedCount;
+      document.getElementById('qaCount').innerText = res.qaCount || 0;
+
+      document.getElementById('folderShortcuts').innerHTML = folders.map(f => 
+        `<a href="${f.url}" target="_blank" class="text-xs px-2.5 py-1 rounded bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition font-heading">📂 ${f.label} ↗</a>`
+      ).join('');
+
+      const select = document.getElementById('bucketFilter');
+      const editSelect = document.getElementById('editBucketKey');
+      const currentVal = select.value;
+      select.innerHTML = '<option value="ALL">📁 แสดงทุกถังข้อมูล (ทั้งหมด)</option>';
+      editSelect.innerHTML = '';
+      
+      document.getElementById('bucketCards').innerHTML = folders.map(f => {
+        select.innerHTML += `<option value="${f.name}">${f.name} (${f.count})</option>`;
+        editSelect.innerHTML += `<option value="${f.key}">${f.name}</option>`;
+        const isUnspec = f.key === 'bucket_unspecified';
+        const pct = total > 0 ? Math.round((f.count / total) * 100) : 0;
+        const barW = pct > 0 ? `${pct}%` : '4%';
+        return `
+          <button onclick="filterByBucket('${f.name}')" class="text-left p-2.5 rounded-xl border ${isUnspec ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50/70'} hover:border-blue-500 hover:shadow-sm transition flex flex-col justify-between">
+            <div>
+              <div class="text-[11px] text-slate-500 truncate font-heading font-medium">${f.label}</div>
+              <div class="flex items-baseline justify-between mt-1">
+                <span class="text-lg font-bold text-slate-800">${f.count} <span class="text-[11px] font-normal text-slate-400">ไฟล์</span></span>
+                <span class="text-[11px] font-heading font-semibold" style="color:${f.color || '#1E3A8A'}">${pct}%</span>
+              </div>
+            </div>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full mt-2 overflow-hidden">
+              <div class="h-full rounded-full" style="width:${barW}; background-color:${f.count > 0 ? (f.color || '#2563EB') : '#CBD5E1'}"></div>
+            </div>
+          </button>
+        `;
+      }).join('');
+      select.value = currentVal;
+
+      setViewMode(currentViewMode);
+      renderQATable();
+    }
+
+    function filterByBucket(bucketName) {
+      const select = document.getElementById('bucketFilter');
+      if (bucketName === 'ALL') {
+        select.value = 'ALL';
+      } else {
+        select.value = (select.value === bucketName) ? 'ALL' : bucketName;
+      }
+      renderFilesView();
+    }
+
+    function getFileVisualMeta(item) {
+      const name = (item.fileName || '').toLowerCase();
+      const ch = item.sourceChannel || '';
+      const isLink = ch.includes('URL') || name.endsWith('.html') || name.includes('link_');
+      const isPdf = name.endsWith('.pdf');
+      const isImg = /\.(jpg|jpeg|png|gif|webp)$/i.test(name);
+      const isDoc = /\.(doc|docx)$/i.test(name);
+      const isXls = /\.(xls|xlsx|csv)$/i.test(name);
+      const isZip = name.endsWith('.zip');
+      const isTxt = name.endsWith('.txt');
+
+      let typeBadge = '📄 เอกสาร';
+      let typeColor = 'bg-slate-100 text-slate-700';
+      if (isPdf) { typeBadge = '📕 PDF'; typeColor = 'bg-red-50 text-red-700 border-red-200'; }
+      else if (isImg) { typeBadge = '🖼️ รูปภาพ'; typeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'; }
+      else if (isLink) { typeBadge = '🔗 ลิงก์เว็บ'; typeColor = 'bg-sky-50 text-sky-700 border-sky-200'; }
+      else if (isDoc) { typeBadge = '📘 Word'; typeColor = 'bg-blue-50 text-blue-700 border-blue-200'; }
+      else if (isXls) { typeBadge = '📗 Excel'; typeColor = 'bg-green-50 text-green-700 border-green-200'; }
+      else if (isZip) { typeBadge = '📦 ZIP'; typeColor = 'bg-amber-50 text-amber-800 border-amber-200'; }
+      else if (isTxt) { typeBadge = '📝 ข้อความ'; typeColor = 'bg-slate-100 text-slate-700 border-slate-300'; }
+
+      const thumbUrl = item.fileId 
+        ? `https://drive.google.com/thumbnail?id=${item.fileId}&sz=w160`
+        : 'https://cdn-icons-png.flaticon.com/512/337/337946.png';
+
+      let channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-heading">💬 LINE OA</span>`;
+      if (ch.includes('Drive')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-heading">☁️ Drive Sync</span>`;
+      } else if (ch.includes('URL')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-heading">🔗 URL Harvester</span>`;
+      } else if (ch.includes('Unzip')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-heading">📦 Auto-Unzip</span>`;
+      } else if (ch.includes('Smart Auto-Batch')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-heading">🪄 Smart Batch</span>`;
+      } else if (ch.includes('Rescue')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-heading">🛟 Auto-Rescue</span>`;
+      } else if (ch.includes('Text')) {
+        channelBadge = `<span class="inline-block text-[11px] px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-heading">📝 LINE Text</span>`;
+      }
+
+      return { thumbUrl, typeBadge, typeColor, channelBadge, isLink, isImg };
+    }
+
+    function getFilteredFiles() {
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
+      const bucket = document.getElementById('bucketFilter').value;
+      const channel = document.getElementById('channelFilter').value;
+
+      return allFiles.filter(item => {
+        const matchBucket = (bucket === 'ALL') || (item.bucket === bucket);
+        const matchChannel = (channel === 'ALL') || (item.sourceChannel.toLowerCase().includes(channel.toLowerCase()));
+        const matchQuery = !q || 
+          item.fileName.toLowerCase().includes(q) || 
+          item.sender.toLowerCase().includes(q) || 
+          item.timestamp.toLowerCase().includes(q) ||
+          item.bucket.toLowerCase().includes(q) ||
+          item.moveHistory.toLowerCase().includes(q) ||
+          item.lastModifiedBy.toLowerCase().includes(q) ||
+          (item.fileHash && item.fileHash.toLowerCase().includes(q));
+        return matchBucket && matchChannel && matchQuery;
+      });
+    }
+
+    function renderFilesView() {
+      const filtered = getFilteredFiles();
+      document.getElementById('resultCount').innerText = `${filtered.length} รายการ`;
+
+      if (currentViewMode === 'grid') {
+        renderGridCards(filtered);
+      } else {
+        renderTable(filtered);
+      }
+    }
+
+    function renderTable(filtered) {
+      if (filtered.length === 0) {
+        document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-10 text-slate-400">ไม่พบเอกสารที่ค้นหา</td></tr>';
+        return;
+      }
+
+      document.getElementById('fileTableBody').innerHTML = filtered.map(item => {
+        const v = getFileVisualMeta(item);
+        const shortHash = (item.fileHash && item.fileHash !== '-' && item.fileHash !== 'N/A') ? item.fileHash.substring(0, 10) + '...' : '';
+
+        const modBadge = (item.lastModifiedBy && item.lastModifiedBy !== '-')
+          ? `<div class="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-0.5 mt-1 inline-block">✏️ แก้ไขล่าสุด: ${escapeHtml(item.lastModifiedBy)}</div>`
+          : '';
+
+        const historyBadge = (item.moveHistory && item.moveHistory !== '-' && item.moveHistory !== 'บันทึกเริ่มต้นผ่าน LINE' && item.moveHistory !== 'บันทึกเริ่มต้น')
+          ? `<div class="text-[11px] text-slate-500 mt-1 max-w-[260px] leading-snug">🔄 ${escapeHtml(item.moveHistory)}</div>`
+          : '';
+
+        const isUnspecBucket = item.bucket.includes('ยังไม่ระบุ');
+        const bucketStyle = isUnspecBucket
+          ? 'bg-amber-100 text-amber-900 border-amber-300'
+          : 'bg-blue-50 text-blue-800 border-blue-200';
+
+        return `
+          <tr class="hover:bg-blue-50/40 transition align-top">
+            <td class="py-3 px-3 whitespace-nowrap">
+              <div onclick="openPreviewModal('${item.fileId}')" class="w-20 h-24 rounded-lg border border-slate-300 overflow-hidden thumb-box relative group cursor-pointer shadow-sm bg-white flex items-center justify-center">
+                <img src="${v.thumbUrl}" loading="lazy" alt="preview" class="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                  onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/337/337946.png'; this.className='w-10 h-10 object-contain opacity-60';">
+                <div class="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                  <span class="text-[10px] font-heading text-white bg-blue-600 px-1.5 py-0.5 rounded shadow">👁️ ดูไฟล์</span>
+                </div>
+                <span class="absolute bottom-0 inset-x-0 bg-slate-900/75 text-white text-[9px] font-heading text-center py-0.5 truncate px-1">${v.typeBadge}</span>
+              </div>
+            </td>
+
+            <td class="py-3.5 px-4 min-w-[280px] sm:min-w-[380px] max-w-[520px]">
+              <div onclick="openPreviewModal('${item.fileId}')" class="font-semibold text-slate-900 hover:text-blue-700 cursor-pointer text-sm leading-snug file-title-clamp" title="${escapeHtml(item.fileName)}">
+                ${escapeHtml(item.fileName)}
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <span class="text-[11px] font-heading px-2 py-0.5 rounded border ${v.typeColor}">${v.typeBadge}</span>
+                ${shortHash ? `<span class="text-[11px] font-mono bg-slate-100 text-teal-800 px-2 py-0.5 rounded border border-slate-200" title="MD5: ${escapeHtml(item.fileHash)}">🧬 MD5: ${shortHash}</span>` : ''}
+              </div>
+              ${modBadge}
+            </td>
+
+            <td class="py-3.5 px-3">
+              <span class="inline-block text-xs font-heading px-2.5 py-1 rounded-full border whitespace-nowrap ${bucketStyle}">
+                ${escapeHtml(item.bucket)}
+              </span>
+              ${historyBadge}
+            </td>
+
+            <td class="py-3.5 px-3 text-xs text-slate-700 whitespace-nowrap">
+              <div class="font-medium">👤 ${escapeHtml(item.sender)}</div>
+              <div class="mt-1">${v.channelBadge}</div>
+              <div class="text-slate-400 mt-1">🕒 ${item.timestamp} (${item.fileSize})</div>
+            </td>
+
+            <td class="py-3.5 px-3 text-center whitespace-nowrap">
+              <div class="flex flex-col sm:flex-row items-center justify-center gap-1.5">
+                <button onclick="openPreviewModal('${item.fileId}')" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-heading px-2.5 py-1.5 rounded-lg shadow-sm transition">
+                  👁️ ดูตัวอย่าง
+                </button>
+                <button onclick="openEditModal('${item.fileId}')" class="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white text-xs font-heading px-2.5 py-1.5 rounded-lg shadow-sm transition">
+                  ✏️ แก้ไข/ย้าย
+                </button>
+                <a href="${item.url}" target="_blank" class="w-full sm:w-auto bg-slate-800 hover:bg-slate-900 text-white text-xs font-heading px-2.5 py-1.5 rounded-lg shadow-sm transition">
+                  เปิด ↗
+                </a>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderGridCards(filtered) {
+      const container = document.getElementById('gridViewContainer');
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="col-span-full text-center py-12 text-slate-400">ไม่พบเอกสารที่ค้นหา</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const v = getFileVisualMeta(item);
+        return `
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between">
+            <div>
+              <div onclick="openPreviewModal('${item.fileId}')" class="h-44 w-full thumb-box relative group cursor-pointer border-b border-slate-200 flex items-center justify-center bg-slate-100 overflow-hidden">
+                <img src="${v.thumbUrl}" loading="lazy" alt="cover" class="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                  onerror="this.onerror=null; this.src='https://cdn-icons-png.flaticon.com/512/337/337946.png'; this.className='w-16 h-16 object-contain opacity-50';">
+                <div class="absolute top-2 left-2">${v.channelBadge}</div>
+                <div class="absolute top-2 right-2 bg-slate-900/80 text-white text-[10px] font-heading px-2 py-0.5 rounded">${item.fileSize}</div>
+                <div class="absolute inset-0 bg-slate-900/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                  <span class="bg-blue-600 text-white text-xs font-heading px-3 py-1.5 rounded-lg shadow">👁️ คลิกดูตัวอย่างไฟล์</span>
+                </div>
+              </div>
+              <div class="p-3.5">
+                <div class="text-[11px] font-heading text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full inline-block mb-1.5 truncate max-w-full">
+                  ${escapeHtml(item.bucket)}
+                </div>
+                <h4 onclick="openPreviewModal('${item.fileId}')" class="font-bold text-slate-900 text-sm file-title-clamp hover:text-blue-600 cursor-pointer" title="${escapeHtml(item.fileName)}">
+                  ${escapeHtml(item.fileName)}
+                </h4>
+                <div class="text-xs text-slate-500 mt-2 flex items-center justify-between">
+                  <span class="truncate">👤 ${escapeHtml(item.sender)}</span>
+                  <span class="text-[11px] text-slate-400 shrink-0">${item.timestamp.split(' ')[0]}</span>
+                </div>
+              </div>
+            </div>
+            <div class="px-3.5 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-1.5">
+              <button onclick="openPreviewModal('${item.fileId}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-heading py-1.5 rounded-lg transition">👁️ ดูตัวอย่าง</button>
+              <button onclick="openEditModal('${item.fileId}')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-heading px-2.5 py-1.5 rounded-lg transition">✏️</button>
+              <a href="${item.url}" target="_blank" class="bg-slate-800 hover:bg-slate-900 text-white text-xs font-heading px-2.5 py-1.5 rounded-lg transition">↗</a>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openPreviewModal(fileId) {
+      const fileObj = allFiles.find(f => f.fileId === fileId);
+      if (!fileObj) return;
+
+      document.getElementById('prevModalTitle').innerText = fileObj.fileName;
+      document.getElementById('prevModalBucket').innerText = fileObj.bucket;
+      document.getElementById('prevModalMeta').innerText = `อัปโหลดโดย ${fileObj.sender} (${fileObj.timestamp})`;
+      document.getElementById('prevModalExternalBtn').href = fileObj.url;
+
+      document.getElementById('prevInfoSender').innerText = fileObj.sender;
+      document.getElementById('prevInfoTime').innerText = fileObj.timestamp;
+      document.getElementById('prevInfoSize').innerText = fileObj.fileSize;
+      document.getElementById('prevInfoChannel').innerText = fileObj.sourceChannel;
+      document.getElementById('prevInfoHash').innerText = fileObj.fileHash || '-';
+      document.getElementById('prevInfoQr').src = `https://quickchart.io/qr?text=${encodeURIComponent(fileObj.url)}&size=200&margin=1`;
+
+      document.getElementById('prevModalEditBtn').onclick = () => {
+        closePreviewModal();
+        openEditModal(fileObj.fileId);
+      };
+
+      const iframe = document.getElementById('prevModalIframe');
+      iframe.src = `https://drive.google.com/file/d/${fileObj.fileId}/preview`;
+
+      const modal = document.getElementById('previewModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closePreviewModal() {
+      const modal = document.getElementById('previewModal');
+      document.getElementById('prevModalIframe').src = 'about:blank';
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderQATable() {
+      const q = (document.getElementById('qaSearchInput')?.value || '').toLowerCase().trim();
+      const filtered = allQA.filter(item => 
+        !q || item.content.toLowerCase().includes(q) || item.sender.toLowerCase().includes(q) || item.type.toLowerCase().includes(q)
+      );
+
+      if (filtered.length === 0) {
+        document.getElementById('qaTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-400">ยังไม่มีรายการข้อคำถามหรือข้อเสนอแนะ</td></tr>';
+        return;
+      }
+
+      document.getElementById('qaTableBody').innerHTML = filtered.map(item => {
+        const isQA = item.type.includes('คำถาม');
+        const typeBadge = isQA
+          ? `<span class="px-2.5 py-1 rounded-full text-xs font-heading bg-teal-50 text-teal-800 border border-teal-200">❓ ข้อคำถาม</span>`
+          : `<span class="px-2.5 py-1 rounded-full text-xs font-heading bg-sky-50 text-sky-800 border border-sky-200">💡 ข้อเสนอแนะ</span>`;
+
+        const statusColor = item.status === 'ดำเนินการเรียบร้อย' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200';
+
+        return `
+          <tr class="hover:bg-slate-50 align-top">
+            <td class="py-3.5 px-4 text-xs text-slate-500 whitespace-nowrap">
+              <div>${item.timestamp}</div>
+              <div class="font-mono text-[11px] text-slate-400 mt-0.5">${escapeHtml(item.id)}</div>
+            </td>
+            <td class="py-3.5 px-3 whitespace-nowrap">${typeBadge}</td>
+            <td class="py-3.5 px-4 text-sm text-slate-900 whitespace-pre-line">${escapeHtml(item.content)}</td>
+            <td class="py-3.5 px-3 text-xs text-slate-700 whitespace-nowrap">
+              <div class="font-medium">👤 ${escapeHtml(item.sender)}</div>
+              <div class="text-slate-400 mt-0.5">${escapeHtml(item.source)}</div>
+            </td>
+            <td class="py-3.5 px-3 text-xs">
+              <span class="inline-block px-2 py-0.5 rounded border font-heading ${statusColor}">${escapeHtml(item.status)}</span>
+              ${item.adminNote && item.adminNote !== '-' ? `<div class="text-slate-600 mt-1">💬 ${escapeHtml(item.adminNote)}</div>` : ''}
+            </td>
+            <td class="py-3.5 px-3 text-center whitespace-nowrap">
+              <button onclick="openQAModal('${item.id}')" class="bg-teal-700 hover:bg-teal-800 text-white text-xs font-heading px-3 py-1.5 rounded-lg shadow-sm">
+                ✏️ ตอบกลับ/สถานะ
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openEditModal(fileId) {
+      const fileObj = allFiles.find(f => f.fileId === fileId);
+      if (!fileObj) return;
+      document.getElementById('editFileId').value = fileObj.fileId;
+      document.getElementById('editFileName').value = fileObj.fileName;
+      document.getElementById('editActorName').value = currentUserProfileName;
+
+      const folderObj = folders.find(fl => fl.name === fileObj.bucket);
+      if (folderObj) document.getElementById('editBucketKey').value = folderObj.key;
+
+      const modal = document.getElementById('editModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeEditModal() {
+      const modal = document.getElementById('editModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function openQAModal(qaId) {
+      const item = allQA.find(q => q.id === qaId);
+      if (!item) return;
+      document.getElementById('editQAId').value = item.id;
+      document.getElementById('editQAStatus').value = item.status;
+      document.getElementById('editQANote').value = item.adminNote !== '-' ? item.adminNote.replace(/\s*\(โดย.*?\)$/, '') : '';
+      document.getElementById('editQAActor').value = currentUserProfileName;
+
+      const modal = document.getElementById('qaModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeQAModal() {
+      const modal = document.getElementById('qaModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    window.onload = () => {
+      initLiffProfile();
+      loadData(false);
+    };
+  </script>
+</body>
+</html>
