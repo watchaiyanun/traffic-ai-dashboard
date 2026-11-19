@@ -30,7 +30,7 @@
     <div class="max-w-7xl mx-auto px-4 py-3.5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
       <div>
         <div class="flex flex-wrap items-center gap-2">
-          <span class="bg-blue-600 text-[11px] font-heading font-semibold px-2.5 py-0.5 rounded uppercase tracking-wider">Smart Archive v3.5 (GitHub + LIFF)</span>
+          <span class="bg-blue-600 text-[11px] font-heading font-semibold px-2.5 py-0.5 rounded uppercase tracking-wider">Smart Archive v3.6 (Sub-folder Ready)</span>
           <span class="bg-purple-600/30 text-purple-200 border border-purple-400/40 text-[11px] px-2 py-0.5 rounded font-heading">🧬 MD5 Verified</span>
           <span id="liffStatusBadge" class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1">
             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> เชื่อมต่อคลังข้อมูลแล้ว
@@ -111,30 +111,38 @@
       <!-- Bucket Progress Cards -->
       <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <h2 class="text-sm font-bold text-slate-700">📊 สัดส่วนเอกสารแยกตามถังข้อมูล (คลิกที่การ์ดเพื่อกรองดูเฉพาะถัง)</h2>
+          <h2 class="text-sm font-bold text-slate-700">📊 สัดส่วนเอกสารแยกตามถังข้อมูล (คลิกที่การ์ดเพื่อกรองดูเฉพาะถังและโฟลเดอร์ย่อย)</h2>
           <div id="folderShortcuts" class="flex flex-wrap gap-1.5"></div>
         </div>
         <div id="bucketCards" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5"></div>
       </div>
 
       <!-- Search & Filter Bar -->
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-3">
-        <div class="flex-1">
-          <input type="text" id="searchInput" oninput="renderFilesView()" placeholder="🔍 ค้นหาชื่อไฟล์, ผู้อัปโหลด, รหัส MD5, ประวัติย้ายถัง หรือวันที่..." 
-            class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-600 outline-none text-sm">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <div class="flex flex-col md:flex-row gap-3">
+          <div class="flex-1">
+            <input type="text" id="searchInput" oninput="renderFilesView()" placeholder="🔍 ค้นหาชื่อไฟล์, โฟลเดอร์ย่อย, ผู้อัปโหลด, รหัส MD5 หรือวันที่..." 
+              class="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-600 outline-none text-sm">
+          </div>
+          <select id="channelFilter" onchange="renderFilesView()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
+            <option value="ALL">🌐 ทุกช่องทางนำเข้า</option>
+            <option value="LINE OA">💬 LINE OA (ไฟล์ปกติ/Batch)</option>
+            <option value="URL">🔗 ลิงก์เว็บไซต์ (URL Harvester)</option>
+            <option value="Unzip">📦 แตกไฟล์ .ZIP อัตโนมัติ</option>
+            <option value="Text">📝 ข้อความบันทึก (.txt)</option>
+            <option value="Drive">☁️ ซิงค์จาก Google Drive</option>
+            <option value="Rescue">🛟 เก็บกู้อัตโนมัติ (Auto-Rescue)</option>
+          </select>
+          <select id="bucketFilter" onchange="onBucketFilterChange()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
+            <option value="ALL">📁 แสดงทุกถังข้อมูล (ทั้งหมด)</option>
+          </select>
         </div>
-        <select id="channelFilter" onchange="renderFilesView()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
-          <option value="ALL">🌐 ทุกช่องทางนำเข้า</option>
-          <option value="LINE OA">💬 LINE OA (ไฟล์ปกติ/Batch)</option>
-          <option value="URL">🔗 ลิงก์เว็บไซต์ (URL Harvester)</option>
-          <option value="Unzip">📦 แตกไฟล์ .ZIP อัตโนมัติ</option>
-          <option value="Text">📝 ข้อความบันทึก (.txt)</option>
-          <option value="Drive">☁️ ซิงค์จาก Google Drive</option>
-          <option value="Rescue">🛟 เก็บกู้อัตโนมัติ (Auto-Rescue)</option>
-        </select>
-        <select id="bucketFilter" onchange="renderFilesView()" class="px-3 py-2.5 rounded-lg border border-slate-300 bg-white text-sm font-heading text-slate-700 outline-none">
-          <option value="ALL">📁 แสดงทุกถังข้อมูล (ทั้งหมด)</option>
-        </select>
+
+        <!-- แถบปุ่มกรองโฟลเดอร์ย่อย (แสดงอัตโนมัติเมื่อเลือกถังหลักที่มีโฟลเดอร์ย่อย) -->
+        <div id="subFolderBar" class="hidden pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <span class="text-xs font-heading font-semibold text-slate-500 mr-1">📂 โฟลเดอร์ย่อยในถังนี้:</span>
+          <div id="subFolderChips" class="flex flex-wrap gap-1.5"></div>
+        </div>
       </div>
 
       <!-- Files Container (Table & Grid) -->
@@ -151,7 +159,7 @@
               <tr class="bg-slate-100 text-slate-600 text-xs font-heading border-b border-slate-200">
                 <th class="py-3 px-3 whitespace-nowrap">ตัวอย่างไฟล์</th>
                 <th class="py-3 px-4 min-w-[280px] sm:min-w-[380px]">ชื่อไฟล์เอกสาร / ลายนิ้วมือ MD5 / ประวัติแก้ไข</th>
-                <th class="py-3 px-3 whitespace-nowrap">ถังข้อมูลปัจจุบัน & ประวัติย้ายถัง</th>
+                <th class="py-3 px-3 whitespace-nowrap">ถังข้อมูลปัจจุบัน & โฟลเดอร์ย่อย</th>
                 <th class="py-3 px-3 whitespace-nowrap">ผู้นำเข้า / ช่องทาง / ขนาด</th>
                 <th class="py-3 px-3 text-center whitespace-nowrap">เปิดดูตัวอย่าง / จัดการ</th>
               </tr>
@@ -316,12 +324,13 @@
 
   <script>
     // ================= ตั้งค่าลิงก์ API ของ Google Apps Script และรหัส LIFF =================
-    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxMUaqdXRP9Da9QESwoHLXREM-IK5GNLHoXV5PRPw4n907chJHdLgTIoRYyushjor7x/exec';
-    const LIFF_ID = '2009589557-DlyOB9nb';
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbxMUaqdXRP9Da9QESwoHLXREM-IK5GNLHoXV5PRPw4n907chJHdLgTloRYyushjor7x/exec';
+    const LIFF_ID = '2009589557-ZA877bKm'; // เปลี่ยนเป็นรหัส LIFF ID ใหม่หากมีการสร้างใหม่
 
     let allFiles = [];
     let allQA = [];
     let folders = [];
+    let selectedSubFolder = 'ALL';
     let currentViewMode = localStorage.getItem('traffic_ai_view_mode') || 'table';
     let currentUserProfileName = localStorage.getItem('traffic_ai_editor_name') || '';
 
@@ -341,7 +350,6 @@
       }
     }
 
-    // ดึงข้อมูลผ่าน Fetch JSON API (ไม่ติดบล็อก Multi-login 100%)
     async function loadData(autoSync = false) {
       document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-12 text-slate-400 font-heading">⏳ กำลังดึงข้อมูลคลังเอกสาร...</td></tr>';
       try {
@@ -349,9 +357,7 @@
         const response = await fetch(url, { method: 'GET', redirect: 'follow' });
         const json = await response.json();
 
-        if (json.status === 'error') {
-          throw new Error(json.message);
-        }
+        if (json.status === 'error') throw new Error(json.message);
         onDataLoaded(json.data || json);
       } catch (err) {
         document.getElementById('fileTableBody').innerHTML = `
@@ -408,7 +414,6 @@
       btn.innerText = '⏳ กำลังบันทึก...';
 
       try {
-        // ใช้ Content-Type: text/plain เพื่อหลีกเลี่ยงปัญหา CORS Preflight ของ Google Apps Script
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -549,7 +554,7 @@
         const pct = total > 0 ? Math.round((f.count / total) * 100) : 0;
         const barW = pct > 0 ? `${pct}%` : '4%';
         return `
-          <button onclick="filterByBucket('${f.name}')" class="text-left p-2.5 rounded-xl border ${isUnspec ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50/70'} hover:border-blue-500 hover:shadow-sm transition flex flex-col justify-between">
+          <button onclick="filterByBucket('${escapeJs(f.name)}')" class="text-left p-2.5 rounded-xl border ${isUnspec ? 'border-amber-300 bg-amber-50/50' : 'border-slate-200 bg-slate-50/70'} hover:border-blue-500 hover:shadow-sm transition flex flex-col justify-between">
             <div>
               <div class="text-[11px] text-slate-500 truncate font-heading font-medium">${f.label}</div>
               <div class="flex items-baseline justify-between mt-1">
@@ -565,8 +570,16 @@
       }).join('');
       select.value = currentVal;
 
+      renderSubFolderChips();
       setViewMode(currentViewMode);
       renderQATable();
+    }
+
+    // ดึงชื่อโฟลเดอร์ย่อยจากข้อความ sourceChannel เช่น "Google Drive (โฟลเดอร์ย่อย: กฎหมายใหม่/ปี 2569)"
+    function extractSubFolder(item) {
+      const ch = String(item.sourceChannel || '');
+      const match = ch.match(/โฟลเดอร์ย่อย:\s*(.+?)\)/);
+      return match ? match[1].trim() : '';
     }
 
     function filterByBucket(bucketName) {
@@ -576,7 +589,85 @@
       } else {
         select.value = (select.value === bucketName) ? 'ALL' : bucketName;
       }
+      onBucketFilterChange();
+    }
+
+    function onBucketFilterChange() {
+      selectedSubFolder = 'ALL';
+      renderSubFolderChips();
       renderFilesView();
+    }
+
+    function selectSubFolder(subPath) {
+      selectedSubFolder = (selectedSubFolder === subPath) ? 'ALL' : subPath;
+      renderSubFolderChips();
+      renderFilesView();
+    }
+
+    // สร้างปุ่มกรองโฟลเดอร์ย่อยอัตโนมัติเมื่อเลือกถังหลัก
+    function renderSubFolderChips() {
+      const bucket = document.getElementById('bucketFilter').value;
+      const bar = document.getElementById('subFolderBar');
+      const container = document.getElementById('subFolderChips');
+
+      if (bucket === 'ALL') {
+        bar.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+      }
+
+      const filesInBucket = allFiles.filter(f => f.bucket === bucket);
+      const subMap = {};
+      let rootCount = 0;
+
+      filesInBucket.forEach(f => {
+        const sub = extractSubFolder(f);
+        if (sub) {
+          subMap[sub] = (subMap[sub] || 0) + 1;
+        } else {
+          rootCount++;
+        }
+      });
+
+      const subList = Object.keys(subMap).sort();
+      if (subList.length === 0) {
+        bar.classList.add('hidden');
+        container.innerHTML = '';
+        return;
+      }
+
+      bar.classList.remove('hidden');
+
+      let html = `
+        <button onclick="selectSubFolder('ALL')" class="text-xs font-heading px-2.5 py-1 rounded-full border transition ${
+          selectedSubFolder === 'ALL'
+            ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+        }">ทั้งหมด (${filesInBucket.length})</button>
+      `;
+
+      if (rootCount > 0) {
+        html += `
+          <button onclick="selectSubFolder('__ROOT__')" class="text-xs font-heading px-2.5 py-1 rounded-full border transition ${
+            selectedSubFolder === '__ROOT__'
+              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+              : 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-blue-50'
+          }">📄 หน้าหลักของถัง (${rootCount})</button>
+        `;
+      }
+
+      subList.forEach(sub => {
+        const active = selectedSubFolder === sub;
+        html += `
+          <button onclick="selectSubFolder('${escapeJs(sub)}')" class="text-xs font-heading px-2.5 py-1 rounded-full border transition ${
+            active
+              ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+              : 'bg-indigo-50/70 text-indigo-800 border-indigo-200 hover:bg-indigo-100'
+          }">📂 ${escapeHtml(sub)} (${subMap[sub]})</button>
+        `;
+      });
+
+      container.innerHTML = html;
     }
 
     function getFileVisualMeta(item) {
@@ -628,17 +719,29 @@
       const channel = document.getElementById('channelFilter').value;
 
       return allFiles.filter(item => {
+        const subFolder = extractSubFolder(item);
         const matchBucket = (bucket === 'ALL') || (item.bucket === bucket);
         const matchChannel = (channel === 'ALL') || (item.sourceChannel.toLowerCase().includes(channel.toLowerCase()));
+        
+        let matchSubFolder = true;
+        if (selectedSubFolder === '__ROOT__') {
+          matchSubFolder = (subFolder === '');
+        } else if (selectedSubFolder !== 'ALL') {
+          matchSubFolder = (subFolder === selectedSubFolder);
+        }
+
         const matchQuery = !q || 
           item.fileName.toLowerCase().includes(q) || 
           item.sender.toLowerCase().includes(q) || 
           item.timestamp.toLowerCase().includes(q) ||
           item.bucket.toLowerCase().includes(q) ||
+          subFolder.toLowerCase().includes(q) ||
+          (item.sourceChannel && item.sourceChannel.toLowerCase().includes(q)) ||
           item.moveHistory.toLowerCase().includes(q) ||
           item.lastModifiedBy.toLowerCase().includes(q) ||
           (item.fileHash && item.fileHash.toLowerCase().includes(q));
-        return matchBucket && matchChannel && matchQuery;
+
+        return matchBucket && matchChannel && matchSubFolder && matchQuery;
       });
     }
 
@@ -676,6 +779,11 @@
           ? 'bg-amber-100 text-amber-900 border-amber-300'
           : 'bg-blue-50 text-blue-800 border-blue-200';
 
+        const subFolder = extractSubFolder(item);
+        const subBadge = subFolder
+          ? `<div class="mt-1"><span class="inline-block text-[11px] font-heading px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200">📂 ${escapeHtml(subFolder)}</span></div>`
+          : '';
+
         return `
           <tr class="hover:bg-blue-50/40 transition align-top">
             <td class="py-3 px-3 whitespace-nowrap">
@@ -704,6 +812,7 @@
               <span class="inline-block text-xs font-heading px-2.5 py-1 rounded-full border whitespace-nowrap ${bucketStyle}">
                 ${escapeHtml(item.bucket)}
               </span>
+              ${subBadge}
               ${historyBadge}
             </td>
 
@@ -740,6 +849,11 @@
 
       container.innerHTML = filtered.map(item => {
         const v = getFileVisualMeta(item);
+        const subFolder = extractSubFolder(item);
+        const subBadgeCard = subFolder
+          ? `<div class="text-[11px] font-heading text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded inline-block mb-1.5 truncate max-w-full">📂 ${escapeHtml(subFolder)}</div>`
+          : '';
+
         return `
           <div class="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col justify-between">
             <div>
@@ -753,8 +867,11 @@
                 </div>
               </div>
               <div class="p-3.5">
-                <div class="text-[11px] font-heading text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full inline-block mb-1.5 truncate max-w-full">
-                  ${escapeHtml(item.bucket)}
+                <div class="flex flex-wrap gap-1 mb-1">
+                  <div class="text-[11px] font-heading text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full inline-block truncate max-w-full">
+                    ${escapeHtml(item.bucket)}
+                  </div>
+                  ${subBadgeCard}
                 </div>
                 <h4 onclick="openPreviewModal('${item.fileId}')" class="font-bold text-slate-900 text-sm file-title-clamp hover:text-blue-600 cursor-pointer" title="${escapeHtml(item.fileName)}">
                   ${escapeHtml(item.fileName)}
@@ -898,6 +1015,10 @@
 
     function escapeHtml(str) {
       return String(str || '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+    }
+
+    function escapeJs(str) {
+      return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
     }
 
     window.onload = () => {
